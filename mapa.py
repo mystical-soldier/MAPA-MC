@@ -252,7 +252,10 @@ if st.session_state.muni_id and st.session_state.seccion_id:
         )
         
     #----3.1.8.6 CAPA COLONIAS      
-
+    if geojson_col['features']:
+    st.write("Campos encontrados en el JSON de Colonias:", geojson_col['features'][0]['properties'].keys())
+    st.write("Valor de prueba en la primera colonia:", geojson_col['features'][0]['properties'])
+        
     if colonias_seccion:
         for feature in colonias_seccion:
             geom_type = feature['geometry']['type']
@@ -544,4 +547,5 @@ else:
             st.session_state.muni_id = id_tocado
             st.rerun()
         else:
+
             st.toast(f"El municipio seleccionado no es prioritario.", icon="X")
