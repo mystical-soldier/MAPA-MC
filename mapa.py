@@ -85,12 +85,26 @@ if st.session_state.muni_id and st.session_state.seccion_id:
         if str(d['properties'].get('SECCION')) == st.session_state.seccion_id
     ]
     #---3.1.4 EXTRAER INFO COLONIA ---
+    
+    # --- DEBUG: Borrar después de probar ---
+    if geojson_col['features']:
+        primer_feature = geojson_col['features'][0]['properties']
+        st.write(f"Buscando Sección: '{st.session_state.seccion_id}' (Tipo: {type(st.session_state.seccion_id)})")
+        st.write(f"Ejemplo de llaves en JSON de Colonias: {list(primer_feature.keys())}")
+# ---------------------------------------
     #----3.1.4.1 FILTRO QUE PERTENECE A LAS COLONIAS DE LA SECCION
-    colonias_seccion = [
-        f for f in geojson_col['features'] 
-        if str(f['properties'].get('seccion')) == st.session_state.seccion_id or
-           str(f['properties'].get('SECCION')) == st.session_state.seccion_id
-    ] 
+    colonias_seccion = []
+    if geojson_col and "features" in geojson_col:
+        for f in geojson_col['features']:
+            props = f.get('properties', {})
+                # Usamos props.get() para evitar que el código truene si la llave no existe
+            seccion_en_json = props.get('SECCION')
+                # Comparación robusta: convertimos ambos a string y limpiamos espacios
+            if seccion_en_json is not None:
+               if str(seccion_en_json).strip() == str(st.session_state.seccion_id).strip():
+                    colonias_seccion.append(f)
+                
+       
      
     #---3.1.4 EXTRAER INFO DE MANZANAS
     #----3.1.4.1 FILTRADO INFORMACION DE MANZANAS
@@ -144,20 +158,15 @@ if st.session_state.muni_id and st.session_state.seccion_id:
             st.write(f"PARTICIPACION ELECTORAL: **{part_pje}%**")
     with c5:
         with st.container(border=True):
-            st.subheader(f"🏙️ Información de Colonias")
+            st.subheader("🏙️ Colonias")
             if colonias_seccion:
-                #Extraemos solo las propiedades (campos de texto) de cada colonia encontrada
-                datos_tabla = [f['properties'] for f in colonias_seccion]
-                #Convertimos a un DataFrame de Pandas para que se vea como tabla
-                df_colonias = pd.DataFrame(datos_tabla)
-                # Mostramos la tabla en Streamlit
-                st.table(df_colonias)(
-                    df_colonias, 
-                    use_container_width=True, 
-                    hide_index=True
-                )
+                # Extraemos las propiedades para el DataFrame
+                df_col = pd.DataFrame([f['properties'] for f in colonias_seccion])
+                # Mostrar solo columnas útiles que existan
+                cols_visibles = [c for c in ['NOMBRE', 'CP', 'SECCION'] if c in df_col.columns]
+                st.dataframe(df_col[cols_visibles], use_container_width=True, hide_index=True)
             else:
-                st.info("No se encontraron registros de colonias para esta sección específica.")
+                st.info("No se encontraron colonias en esta sección.")
             
     #---3.1.8 MAPA DE MANZANAS ---
     st.markdown(f"### Mapa de Manzanas - Seccion {st.session_state.seccion_id}")
@@ -252,7 +261,13 @@ if st.session_state.muni_id and st.session_state.seccion_id:
         )
         
     #----3.1.8.6 CAPA COLONIAS      
-
+    # Esto ahora mostrará solo las colonias de la sección seleccionada
+    if colonias_seccion:
+        st.write(f"📍 Viendo {len(colonias_seccion)} colonia(s) en la Sección {st.session_state.seccion_id}:")
+        st.json(colonias_seccion[0]['properties']) # Muestra la primera encontrada en esa sección
+    else:
+        st.warning(f"No se encontraron colonias en el JSON para la sección {st.session_state.seccion_id}")
+    
     if colonias_seccion:
         for feature in colonias_seccion:
             geom_type = feature['geometry']['type']
