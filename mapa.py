@@ -1,4 +1,5 @@
 import streamlit as st
+import textwrap
 import json
 import pandas as pd
 import plotly.express as px
@@ -72,6 +73,7 @@ if st.session_state.muni_id and st.session_state.seccion_id:
         c['properties'] for c in geojson_local['features'] 
         if str(c['properties'].get('SECCION')) == st.session_state.seccion_id
     ]
+    df_loc = pd.DataFrame(localidad_seccion)
     #---3.1.2 EXTRAER INFO DE CASILLAS ---
     #----3.1.2.1Filtramos las casillas que pertenecen a la seccion seleccionada
     casillas_seccion = [
@@ -87,10 +89,7 @@ if st.session_state.muni_id and st.session_state.seccion_id:
     #---3.1.4 EXTRAER INFO COLONIA ---
     
     # --- DEBUG: Borrar después de probar ---
-    if geojson_col['features']:
-        primer_feature = geojson_col['features'][0]['properties']
-        st.write(f"Buscando Sección: '{st.session_state.seccion_id}' (Tipo: {type(st.session_state.seccion_id)})")
-        st.write(f"Ejemplo de llaves en JSON de Colonias: {list(primer_feature.keys())}")
+   
 # ---------------------------------------
     #----3.1.4.1 FILTRO QUE PERTENECE A LAS COLONIAS DE LA SECCION
     colonias_seccion = []
@@ -103,9 +102,7 @@ if st.session_state.muni_id and st.session_state.seccion_id:
             if seccion_en_json is not None:
                if str(seccion_en_json).strip() == str(st.session_state.seccion_id).strip():
                     colonias_seccion.append(f)
-                
-       
-     
+    df_col = pd.DataFrame([f['properties'] for f in colonias_seccion])            
     #---3.1.4 EXTRAER INFO DE MANZANAS
     #----3.1.4.1 FILTRADO INFORMACION DE MANZANAS
     df_manz_secc = df_manz[df_manz['Secc'] == st.session_state.seccion_id]   
@@ -123,30 +120,68 @@ if st.session_state.muni_id and st.session_state.seccion_id:
         st.session_state.seccion_id = None
         st.rerun()
     #---3.1.7 CUADROS INFORMATIVOS NIVEL SECCION ---
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4 = st.columns(4)
     #----3.1.7.1 RECUADRO DE INFORMACION 1 (MUNICIPIO Y SECCION)
     with c1:
-        with st.container(border=True):
-            st.subheader("UBICACION")
-            st.write(f"Seccion: **{st.session_state.seccion_id}**")
-            st.write(f"Municipio ID: **{st.session_state.muni_id}**")
+       
+       with st.container(border=True):
+           st.subheader("DATOS DE CASILLA")
+           d1, d2 = st.columns(2)
+           
+           with d1:
+                with st.container(border=True):
+                    
+                    if info_geo_casilla:
+                        st.write(f"**TIPO CASILLA:**")
+                        st.caption(info_geo_casilla.get('casilla', 'Sin dato'))
+                        st.write(f"**DOMICILIO:**") 
+                        st.caption (info_geo_casilla.get('domicilio', 'Sin dato'))
+                                                                        
+                    else:
+                        st.warning("No hay datos de casilla para esta seccion.") 
+                    
+           with d2:
+                with st.container(border=True):
+                    
+                    if info_geo_casilla:
+                        
+                        st.write(f"**Ubicacion:**")
+                        st.caption(info_geo_casilla.get('ubicacion', 'Sin dato'))
+                        st.write(f"**Ref:**")
+                        st.caption(info_geo_casilla.get('referencia', 'Sin dato'))
+                    else:
+                        st.warning("No hay datos de casilla para esta seccion.")        
     #----3.1.7.2 RECUADRO DE INFORMACION 2 UBICACION CASILLA (INFORMACION EXTRAIDA DEL JSON DE CASILLAS)        
     with c2:
         with st.container(border=True):
-            st.subheader("DATOS DE CASILLA")
-            if info_geo_casilla:
-                st.write(f"**Domicilio:** {info_geo_casilla.get('domicilio', 'Sin dato')}")
-                st.write(f"**Ubicacion:** {info_geo_casilla.get('ubicacion', 'Sin dato')}")
-                st.info(f"**Ref:** {info_geo_casilla.get('referencia', 'Sin dato')}")
+            st.subheader("🏘️ Colonias")
+            if not df_col.empty:
+                # Filtramos solo la columna NOMBRE (o las que necesites)
+                cols_visibles = [c for c in ['NOMBRE'] if c in df_col.columns]
+                
+                # 3. Tabla con configuración fija
+                st.dataframe(
+                    df_col[cols_visibles], 
+                    use_container_width=True, 
+                    hide_index=True,
+                    column_config={
+                        "NOMBRE": st.column_config.TextColumn(
+                            "Nombre de la Colonia/Localidad",
+                            help="Lista de asentamientos humanos registrados en la sección",
+                            width="large", # Esto hace que la columna sea ancha y fija
+                        )
+                    }
+                )
+                
             else:
-                st.warning("No hay datos de casilla para esta seccion.")
+                st.info("No se encontraron colonias en esta sección.")
     with c3:
         with st.container(border=True):
-            st.subheader("LOCALIDADES")
+            st.subheader("🏢 INFO SECCION")
             # Supongamos que tienes una columna 'Localidad' en tu CSV de manzanas
             n_loc = df_manz_secc['Localidad'].nunique() if 'Localidad' in df_datmanz_secc.columns else "N/A"
             n_col = df_manz_secc['Colonia'].nunique() if 'Colonia' in df_datmanz_secc.columns else "N/A"
-            st.write(f"Dentro de la seccion hay **{n_loc}** localidades y ademas cuenta con ***{n_col}*** colonias")
+            st.write(f"Dentro de la seccion hay **{len(df_loc)}** localidades y ademas cuenta con ***{len(df_col)}*** colonias")
     with c4:
         with st.container(border=True): 
             st.subheader("LISTADO NOMINAL SECCIONAL")
@@ -156,85 +191,61 @@ if st.session_state.muni_id and st.session_state.seccion_id:
             part_pje = datos_seccion_actual.get('PORCENTAJE PARTICIPACION CIUDADANA', 'N/A')
             st.write(f"LISTADO NOMINAL SECCIONAL: **{ln_total:,}**")
             st.write(f"PARTICIPACION ELECTORAL: **{part_pje}%**")
-    with c5:
-        with st.container(border=True):
-            st.subheader("🏙️ Colonias")
-            if colonias_seccion:
-                # Extraemos las propiedades para el DataFrame
-                df_col = pd.DataFrame([f['properties'] for f in colonias_seccion])
-                # Mostrar solo columnas útiles que existan
-                cols_visibles = [c for c in ['NOMBRE', 'CP', 'SECCION'] if c in df_col.columns]
-                st.dataframe(df_col[cols_visibles], use_container_width=True, hide_index=True)
-            else:
-                st.info("No se encontraron colonias en esta sección.")
             
     #---3.1.8 MAPA DE MANZANAS ---
-    st.markdown(f"### Mapa de Manzanas - Seccion {st.session_state.seccion_id}")
-    
-    #----3.1.8.1 Filtrar GeoJSON por la seccion seleccionada
-    manzanas_geo = {
-        "type": "FeatureCollection",
-        "features": [f for f in geojson_manz['features'] if str(f['properties'].get('SECCION')) == st.session_state.seccion_id]
-    }   
-    #----3.1.8.2 Calcular centros de cada manzana
-    manza_list = []
-    for f in manzanas_geo['features']:
-        m_id = str(f['properties'].get('MANZANA'))
-        geom = f['geometry'] # Cambiado geon por geom para consistencia
+    col_mapa, col_tabla = st.columns([1.8, 1.2])
+    with col_mapa:
+        st.markdown(f"### Mapa de Manzanas - Seccion {st.session_state.seccion_id}")
         
-        try:
-            if geom['type'] == 'Polygon':
-                coords = geom['coordinates'][0]
-            else: # MultiPolygon
-                coords = geom['coordinates'][0][0]
+        #----3.1.8.1 Filtrar GeoJSON por la seccion seleccionada
+        manzanas_geo = {
+            "type": "FeatureCollection",
+            "features": [f for f in geojson_manz['features'] if str(f['properties'].get('SECCION')) == st.session_state.seccion_id]
+        }   
+        #----3.1.8.2 Calcular centros de cada manzana
+        manza_list = []
+        for f in manzanas_geo['features']:
+            m_id = str(f['properties'].get('MANZANA'))
+            geom = f['geometry'] # Cambiado geon por geom para consistencia
             
-            lon_m = sum(c[0] for c in coords) / len(coords)
-            lat_m = sum(c[1] for c in coords) / len(coords)
-            
-            manza_list.append({'Manzana': m_id, 'lat': lat_m, 'lon': lon_m})
-        except:
-            continue  
-            
-    df_centros_manz = pd.DataFrame(manza_list)
-        
-    #----3.1.8.3 DIBUJAR EL MAPA DE LAS MANZANAS
-    fig_manz = px.choropleth(
-        df_manz_secc, 
-        geojson=manzanas_geo, 
-        locations="Manzana",
-        featureidkey="properties.MANZANA", 
-        color="PRIO",
-        color_discrete_map={'SI': '#FF8C00', 'NO': '#2E8B57'},
-        projection="mercator"
-    )
-    
-    #---3.1.8.4 CAPA DE DELIMITACION DE LA SECCION (BORDE NEGRO) ---
-    # Filtramos el GeoJSON de secciones para obtener solo la actual
-    contorno_seccion = [
-        f for f in geojson_secc['features'] 
-        if str(f['properties'].get('SECCION')) == st.session_state.seccion_id or 
-           str(f['properties'].get('seccion')) == st.session_state.seccion_id
-    ]
-    if contorno_seccion:
-        #EXTRAEMOS LAS COORDENADAS DEL POLIGONO DE LA SECCION
-        for feature in contorno_seccion:
-            if feature['geometry']['type'] == 'Polygon':
-                coords = feature['geometry']['coordinates'][0]
-                lons = [c[0] for c in coords]
-                lats = [c[1] for c in coords]
+            try:
+                if geom['type'] == 'Polygon':
+                    coords = geom['coordinates'][0]
+                else: # MultiPolygon
+                    coords = geom['coordinates'][0][0]
                 
-                fig_manz.add_scattergeo(
-                    lat=lats,
-                    lon=lons,
-                    mode='lines',
-                    line=dict(width=3, color='black'), # Borde negro grueso
-                    hoverinfo='skip',
-                    showlegend=False,
-                    name="LIMITE DE SECCION"
-                )
-            elif feature['geometry']['type'] == 'MultiPolygon':
-                for polygon in feature['geometry']['coordinates']:
-                    coords = polygon[0]
+                lon_m = sum(c[0] for c in coords) / len(coords)
+                lat_m = sum(c[1] for c in coords) / len(coords)
+                
+                manza_list.append({'Manzana': m_id, 'lat': lat_m, 'lon': lon_m})
+            except:
+                continue  
+                
+        df_centros_manz = pd.DataFrame(manza_list)
+            
+        #----3.1.8.3 DIBUJAR EL MAPA DE LAS MANZANAS
+        
+        fig_manz = px.choropleth(
+            df_manz_secc, 
+            geojson=manzanas_geo, 
+            locations="Manzana",
+            featureidkey="properties.MANZANA", 
+            color="PRIO",
+            color_discrete_map={'SI': '#FF6700', 'NO': '#FFCC80'},
+            projection="mercator"
+        )
+        #---3.1.8.4 CAPA DE DELIMITACION DE LA SECCION (BORDE NEGRO) ---
+        # Filtramos el GeoJSON de secciones para obtener solo la actual
+        contorno_seccion = [
+            f for f in geojson_secc['features'] 
+            if str(f['properties'].get('SECCION')) == st.session_state.seccion_id or 
+               str(f['properties'].get('seccion')) == st.session_state.seccion_id
+        ]
+        if contorno_seccion:
+            #EXTRAEMOS LAS COORDENADAS DEL POLIGONO DE LA SECCION
+            for feature in contorno_seccion:
+                if feature['geometry']['type'] == 'Polygon':
+                    coords = feature['geometry']['coordinates'][0]
                     lons = [c[0] for c in coords]
                     lats = [c[1] for c in coords]
                     
@@ -242,157 +253,189 @@ if st.session_state.muni_id and st.session_state.seccion_id:
                         lat=lats,
                         lon=lons,
                         mode='lines',
-                        line=dict(width=3, color='black'),
+                        line=dict(width=3, color='black'), # Borde negro grueso
                         hoverinfo='skip',
-                        showlegend=False
+                        showlegend=False,
+                        name="LIMITE DE SECCION"
                     )
-    
-    
-    #----3.1.8.5 NuMEROS BLANCO (Alineado perfectamente con fig_manz)
-    if not df_centros_manz.empty:
-        fig_manz.add_scattergeo(
-            lon = df_centros_manz['lon'],
-            lat = df_centros_manz['lat'],
-            text = df_centros_manz['Manzana'],
-            mode = 'text',
-            textfont = dict(size=8, color="white", family="Arial Black"),
-            hoverinfo='skip',
-            showlegend=False
-        )
-        
-    #----3.1.8.6 CAPA COLONIAS      
-    # Esto ahora mostrará solo las colonias de la sección seleccionada
-    if colonias_seccion:
-        st.write(f"📍 Viendo {len(colonias_seccion)} colonia(s) en la Sección {st.session_state.seccion_id}:")
-        st.json(colonias_seccion[0]['properties']) # Muestra la primera encontrada en esa sección
-    else:
-        st.warning(f"No se encontraron colonias en el JSON para la sección {st.session_state.seccion_id}")
-    
-    if colonias_seccion:
-        for feature in colonias_seccion:
-            geom_type = feature['geometry']['type']
-            coords_list = []           
-            # Manejo de Polígonos y MultiPolígonos
-            if geom_type == 'Polygon':
-                coords_list = [feature['geometry']['coordinates']]
-            elif geom_type == 'MultiPolygon':
-                coords_list = feature['geometry']['coordinates']
-                
-            for polygon in coords_list:
-                #polygon[0] contiene los puntos del contorno exterior
-                puntos = polygon[0]
-                lons = [c[0] for c in puntos]
-                lats = [c[1] for c in puntos]
-                
-                #Nombre de la colonia para el hover
-                nombre_colonia = feature['properties'].get('NOMBRE', 'Colonia Sin Nombre')
+                elif feature['geometry']['type'] == 'MultiPolygon':
+                    for polygon in feature['geometry']['coordinates']:
+                        coords = polygon[0]
+                        lons = [c[0] for c in coords]
+                        lats = [c[1] for c in coords]
+                        
+                        fig_manz.add_scattergeo(
+                            lat=lats,
+                            lon=lons,
+                            mode='lines',
+                            line=dict(width=3, color='black'),
+                            hoverinfo='skip',
+                            showlegend=False
+                        )
+        #----3.1.8.5 NuMEROS BLANCO (Alineado perfectamente con fig_manz)
+        if not df_centros_manz.empty:
+            fig_manz.add_scattergeo(
+                lon = df_centros_manz['lon'],
+                lat = df_centros_manz['lat'],
+                text = df_centros_manz['Manzana'],
+                mode = 'text',
+                textfont = dict(size=8, color="white", family="Arial Black"),
+                hoverinfo='skip',
+                showlegend=False
+            )
+            
+        #----3.1.8.6 CAPA COLONIAS      
+        if colonias_seccion:
+            for feature in colonias_seccion:
+                geom_type = feature['geometry']['type']
+                coords_list = []           
+                # Manejo de Polígonos y MultiPolígonos
+                if geom_type == 'Polygon':
+                    coords_list = [feature['geometry']['coordinates']]
+                elif geom_type == 'MultiPolygon':
+                    coords_list = feature['geometry']['coordinates']
+                    
+                for polygon in coords_list:
+                    #polygon[0] contiene los puntos del contorno exterior
+                    puntos = polygon[0]
+                    lons = [c[0] for c in puntos]
+                    lats = [c[1] for c in puntos]
+                    
+                    #Nombre de la colonia para el hover
+                    nombre_colonia = feature['properties'].get('NOMBRE', 'Colonia Sin Nombre')
 
-                fig_manz.add_scattergeo(
-                    lat=lats,
-                    lon=lons,
-                    mode='lines',
-                    line=dict(
-                        width=2, 
-                        color='red' # Contorno rojo
-                    ),
-                    hovertext=f"Colonia: {nombre_colonia}",
-                    hoverinfo='text',
-                    showlegend=True,
-                    name="Colonia"
-                )    
-        
-    #----3.1.8.5 CAPA PAVIMENTO
-    if pavimento_seccion:
-        all_lats = []
-        all_lons = []
-        hover_textos = []
-        for feature in pavimento_seccion:
-            # Extraemos las coordenadas
-            coords = feature['geometry']['coordinates']
-            # IMPORTANTE: Validar si es LineString simple
-            if feature['geometry']['type'] == 'LineString':
-                # c[0] es Longitud, c[1] es Latitud
-                lons = [c[0] for c in coords]
-                lats = [c[1] for c in coords]
-                all_lons.extend(lons + [None])
-                all_lats.extend(lats + [None])
+                    fig_manz.add_scattergeo(
+                        lat=lats,
+                        lon=lons,
+                        mode='lines',
+                        line=dict(
+                            width=2, 
+                            color='red' # Contorno rojo
+                        ),
+                        hovertext=f"Colonia: {nombre_colonia}",
+                        hoverinfo='text',
+                        showlegend=True,
+                        name="Colonia"
+                    )        
+        #----3.1.8.5 CAPA PAVIMENTO
+        if pavimento_seccion:
+            all_lats = []
+            all_lons = []
+            hover_textos = []
+            for feature in pavimento_seccion:
+                # Extraemos las coordenadas
+                coords = feature['geometry']['coordinates']
+                # IMPORTANTE: Validar si es LineString simple
+                if feature['geometry']['type'] == 'LineString':
+                    # c[0] es Longitud, c[1] es Latitud
+                    lons = [c[0] for c in coords]
+                    lats = [c[1] for c in coords]
+                    all_lons.extend(lons + [None])
+                    all_lats.extend(lats + [None])
 
-        # Usamos add_scattergeo con un color llamativo para probar (Rojo)
-        #-----3.1.8.5.1 CAPA BASE (EL ASFALTO)
-        fig_manz.add_scattergeo(
-            lat=all_lats,
-            lon=all_lons,
-            mode='lines',
-            line=dict(
-                width=5,          # MAS ancha para que se vea como calle
-                color='#333333'   # ASFALTO
-            ),
-            hovertext=hover_textos,
-            hoverinfo='text',
-            name="Pavimento"
-        )
-        #-----3.1.8.5.2 CAPA SUPERIOR (LA LINEA DIVISORIA)
-        fig_manz.add_scattergeo(
-            lat=all_lats,
-            lon=all_lons,
-            mode='lines',
-            line=dict(
-                width=1,          # Muy delgada
-                color='white',    # Color de la raya central
-                dash='dash'       # Esto la hace punteada (opcional)
-            ),
-            hoverinfo='skip',     # Para que no estorbe al pasar el mouse
-            showlegend=False      # No queremos que aparezca dos veces en la leyenda
-        )
-    
-    #----3.1.8.6 CAPA DE CASILLAS ---
-    if casillas_seccion:
-        df_casillas = pd.DataFrame(casillas_seccion)
-        
-        # Extraemos coordenadas manualmente del JSON original filtrado
-        lats = [c['geometry']['coordinates'][1] for c in geojson_casilla['features'] if str(c['properties'].get('seccion')) == st.session_state.seccion_id]
-        lons = [c['geometry']['coordinates'][0] for c in geojson_casilla['features'] if str(c['properties'].get('seccion')) == st.session_state.seccion_id]
+            # Usamos add_scattergeo con un color llamativo para probar (Rojo)
+            #-----3.1.8.5.1 CAPA BASE (EL ASFALTO)
+            fig_manz.add_scattergeo(
+                lat=all_lats,
+                lon=all_lons,
+                mode='lines',
+                line=dict(
+                    width=5,          # MAS ancha para que se vea como calle
+                    color='#333333'   # ASFALTO
+                ),
+                hovertext=hover_textos,
+                hoverinfo='text',
+                name="Pavimento"
+            )
+            #-----3.1.8.5.2 CAPA SUPERIOR (LA LINEA DIVISORIA)
+            fig_manz.add_scattergeo(
+                lat=all_lats,
+                lon=all_lons,
+                mode='lines',
+                line=dict(
+                    width=1,          # Muy delgada
+                    color='white',    # Color de la raya central
+                    dash='dash'       # Esto la hace punteada (opcional)
+                ),
+                hoverinfo='skip',     # Para que no estorbe al pasar el mouse
+                showlegend=False      # No queremos que aparezca dos veces en la leyenda
+            )
+        #----3.1.8.6 CAPA DE CASILLAS ---
+        if casillas_seccion:
+            df_casillas = pd.DataFrame(casillas_seccion)
+            
+            # Extraemos coordenadas manualmente del JSON original filtrado
+            lats = [c['geometry']['coordinates'][1] for c in geojson_casilla['features'] if str(c['properties'].get('seccion')) == st.session_state.seccion_id]
+            lons = [c['geometry']['coordinates'][0] for c in geojson_casilla['features'] if str(c['properties'].get('seccion')) == st.session_state.seccion_id]
 
-        #CAPA DE VISUALIZACION EN EL MAPA
-        fig_manz.add_scattergeo(
-            lat=lats,
-            lon=lons,
-            mode='text',  # <--- IMPORTANTE: Solo texto para que se vea el emoji
-            text='🗳️',    # <--- EMOJI URNA ELECTORAL
-            textfont=dict(size=15), # TAMANO DE LETRA / EMOJI
-            hovertext=[f"TIPO CASILLA: {c['casilla']}<br>UBICACION: {c['ubicacion']}" 
-                for c in casillas_seccion
-            ],
-            hoverinfo='text',
-            name="Casillas"
-        )
-    
-    #----3.1.8.7 CAPA DE LOCALIDADES
-    if localidad_seccion:
-        df_localidad = pd.DataFrame(localidad_seccion)
-        
-        #-----3.1.8.6.1 Extraemos coordenadas manualmente del JSON original filtrado
-        lats = [c['geometry']['coordinates'][1] for c in geojson_local['features'] if str(c['properties'].get('SECCION')) == st.session_state.seccion_id]
-        lons = [c['geometry']['coordinates'][0] for c in geojson_local['features'] if str(c['properties'].get('SECCION')) == st.session_state.seccion_id]
+            #CAPA DE VISUALIZACION EN EL MAPA
+            fig_manz.add_scattergeo(
+                lat=lats,
+                lon=lons,
+                mode='text',  # <--- IMPORTANTE: Solo texto para que se vea el emoji
+                text='🗳️',    # <--- EMOJI URNA ELECTORAL
+                textfont=dict(size=15), # TAMANO DE LETRA / EMOJI
+                hovertext=[f"TIPO CASILLA: {c['casilla']}<br>UBICACION: {c['ubicacion']}" 
+                    for c in casillas_seccion
+                ],
+                hoverinfo='text',
+                name="Casillas"
+            )
+        #----3.1.8.7 CAPA DE LOCALIDADES
+        if localidad_seccion:
+            df_localidad = pd.DataFrame(localidad_seccion)
+            
+            #-----3.1.8.6.1 Extraemos coordenadas manualmente del JSON original filtrado
+            lats = [c['geometry']['coordinates'][1] for c in geojson_local['features'] if str(c['properties'].get('SECCION')) == st.session_state.seccion_id]
+            lons = [c['geometry']['coordinates'][0] for c in geojson_local['features'] if str(c['properties'].get('SECCION')) == st.session_state.seccion_id]
 
-        #-----3.1.8.7.1 Agregamos la capa
-        fig_manz.add_scattergeo(
-            lat=lats,
-            lon=lons,
-            mode ='text',
-            text='📍',    # <--- EMOJI MARCADOR
-            textfont=dict(size=15), # TAMANO DE LETRA / EMOJI
-            hovertext=[f"NOMBRE: {c['NOMBRE']}<br>NUMERO: {c['LOCALIDAD']}" 
-                for c in localidad_seccion
-            ],
-            hoverinfo='text',
-            name="localidad" 
-        )
-     
-    #----3.1.8.8 RENDERIZAR MAPA  
-    fig_manz.update_geos(fitbounds="locations", visible=False)
-    fig_manz.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=500)
-    st.plotly_chart(fig_manz, use_container_width=True)    
+            #-----3.1.8.7.1 Agregamos la capa
+            fig_manz.add_scattergeo(
+                lat=lats,
+                lon=lons,
+                mode ='text',
+                text='📍',    # <--- EMOJI MARCADOR
+                textfont=dict(size=15), # TAMANO DE LETRA / EMOJI
+                hovertext=[f"NOMBRE: {c['NOMBRE']}<br>NUMERO: {c['LOCALIDAD']}" 
+                    for c in localidad_seccion
+                ],
+                hoverinfo='text',
+                name="localidad" 
+            )
+        #----3.1.8.8 RENDERIZAR MAPA  
+        fig_manz.update_geos(fitbounds="locations", visible=False)
+        fig_manz.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=500)
+        st.plotly_chart(fig_manz, use_container_width=True)    
+        #TABLA MANZANAS
+    with col_tabla:
+        
+        st.markdown(f"### MANZANA")
+        secciones_filtro = df_manz_secc
+
+        if not secciones_filtro.empty:
+            def style_prio(mp):
+                estilo_base = 'text-align: center;'
+                if str(mp['PRIO']).upper() == 'SI':
+                    estilo_prio = 'background-color: #FF6700; color: white; font-weight: bold;'
+                    return [f"{estilo_base} {estilo_prio}"] * len(mp)
+
+                return [estilo_base] * len(mp)
+            df_estilado = secciones_filtro.style.apply(style_prio, axis=1)
+                    
+            st.dataframe(
+                df_estilado,
+                column_order=("Localidad", "Manzana", "Listado Nominal Total"),
+                hide_index=True,
+                #use_container_width=True,
+                column_config={
+                    "Localidad": st.column_config.TextColumn("Localidad"),
+                    "Manzana": st.column_config.TextColumn("Manzana"),
+                    "Listado Nominal Total": st.column_config.NumberColumn("Listado Nominal", format="%d")
+                    },
+                height=500,
+            )
+        else:
+            st.warning("No hay datos de secciones.")
      
 
 #----3.2 CARGA DE MAPA DE MUNICIPIO
@@ -475,19 +518,19 @@ elif st.session_state.muni_id:
             locations="Secc", # COLUMNAS EN EL CVS DE SECCION
             featureidkey="properties.SECCION", # Clave en tu JSON de secciones
             color="PRIO", # COLOR POR PRIORIDAD
-            color_discrete_map={'SI': '#FF8C00', 'NO': '#2E8B57'},
+            color_discrete_map={'SI': '#FF6700', 'NO': '#FFCC80'},
             projection="mercator"
         )
         
         
-        # 3.3.5 NUMEROS BLANCO
+        # 3.3.5 NUMEROS
         if not df_centros_secc.empty:
             fig_secc.add_scattergeo(
                 lon = df_centros_secc['lon'],
                 lat = df_centros_secc['lat'],
                 text = df_centros_secc['Secc'],
                 mode = 'text',
-                textfont = dict(size=8, color="white", family="Arial Black"),
+                textfont = dict(size=8, color="black", family="Arial Black"),
                 hoverinfo='skip',
                 showlegend=False
             )
@@ -508,20 +551,28 @@ elif st.session_state.muni_id:
         
         st.markdown(f"### Secciones")
         secciones_filtro = df_secc[df_secc['Cve Mpio'] == st.session_state.muni_id].copy()
+       
 
         if not secciones_filtro.empty:
             def style_prio(df):
-                color_map = pd.DataFrame('', index=df.index, columns=df.columns)
-                mask = df['PRIO'] == 'SI'
-                color_map.loc[mask, :] = 'background-color: #FF8C00; color: white; font-weight: bold;'
-                return color_map
+                estilo_base = 'text-align: center;'
+                if str(df['PRIO']).upper() == 'SI':
+                    estilo_prio = 'background-color: #FF6700; color: white; font-weight: bold;'
+                    return [f"{estilo_base} {estilo_prio}"] * len(df)
 
+                return [estilo_base] * len(df)
+            df_estilado = secciones_filtro.style.apply(style_prio, axis=1)
+                    
             st.dataframe(
-                secciones_filtro.style.apply(style_prio, axis=None),
+                df_estilado,
                 column_order=("Secc", "Listado Nominal Total"),
-                use_container_width=True,
                 hide_index=True,
-                height=450
+                #use_container_width=True,
+                column_config={
+                    "Secc": st.column_config.TextColumn("Sección"),
+                    "Listado Nominal Total": st.column_config.NumberColumn("Listado Nominal", format="%d")
+                    },
+                height=500,
             )
         else:
             st.warning("No hay datos de secciones.")
@@ -534,24 +585,87 @@ else:
     for f in geojson_mun['features']:
         ids_todos.append(str(f['properties']['MUNICIPIO']))
         nombres_todos.append(f['properties']['NOMBRE'])
-    
+            
     df_base = pd.DataFrame({'ID': ids_todos, 'NOMBRE': nombres_todos})
     df_base['Color_Status'] = df_base['ID'].apply(lambda x: 'Prioritario' if x in municipios_naranja else 'Normal')
 
+    # --- Calcular centros para etiquetas ---
+    lats_centros = []
+    lons_centros = []
+    nombres_centros = []
+    ids_hover = []
+
+    for f in geojson_mun['features']:
+        props = f['properties']
+        geom = f['geometry']
+        
+        # Extraemos todas las coordenadas para promediarlas
+        todas_coords = []
+        if geom['type'] == 'Polygon':
+            todas_coords = geom['coordinates'][0]
+        elif geom['type'] == 'MultiPolygon':
+            # Tomamos el polígono más grande o el primero
+            todas_coords = geom['coordinates'][0][0]
+        
+        lons = [c[0] for c in todas_coords]
+        lats = [c[1] for c in todas_coords]
+        
+        # Centroide simple
+        lons_centros.append(sum(lons) / len(lons))
+        lats_centros.append(sum(lats) / len(lats))
+        nombre_original = props.get('NOMBRE', '')
+        nombre_ajustado = "<br>".join(textwrap.wrap(nombre_original, width=12))
+        nombres_centros.append(nombre_ajustado)
+        ids_hover.append(props.get('MUNICIPIO', ''))
+
+    # Creamos el mapa base
     fig_gral = px.choropleth(
-        df_base, geojson=geojson_mun, locations="ID",
-        featureidkey="properties.MUNICIPIO", color="Color_Status",
-        hover_name="NOMBRE",
-        color_discrete_map={'Prioritario': '#FF8C00', 'Normal': '#2E8B57'},
+        df_base, 
+        geojson=geojson_mun, 
+        locations="ID",
+        featureidkey="properties.MUNICIPIO", 
+        color="Color_Status",
+        color_discrete_map={'Prioritario': '#FF6700', 'Normal': '#FFCC80'}, # Naranja fuerte y suave
         projection="mercator"
     )
 
-    fig_gral.update_traces(hoverlabel=dict(bgcolor="gray"), selector=dict(type='choropleth'))
-    fig_gral.update_layout(hovermode="closest", clickmode="event+select")
-    fig_gral.update_geos(fitbounds="locations", visible=False)
-    fig_gral.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=600, showlegend=False)
-    
-    event = st.plotly_chart(fig_gral, on_select="rerun", use_container_width=True)
+        # --- CONFIGURAR HOVER 
+    fig_gral.update_traces(
+        hovertemplate="<b>Municipio: %{location}</b><extra></extra>",
+        selector=dict(type='choropleth')
+    )
+
+    # --- AÑADIR NOMBRES EN EL CENTRO ---
+    fuentes_dinamicas = [7 if len(n) > 15 else 9 for n in nombres_centros]
+    fig_gral.add_scattergeo(
+        lat=lats_centros,
+        lon=lons_centros,
+        text=nombres_centros,
+        textposition="middle center",
+        mode='text',
+        textfont=dict(color="black", size=8), # Nombres en negro
+        hoverinfo='skip', # Para que el texto no interfiera con el hover del mapa
+        showlegend=False
+    )
+
+    # --- AJUSTES DE ZOOM Y VISTA ---
+    fig_gral.update_geos(
+        fitbounds="locations",
+        visible=False
+    )
+
+    fig_gral.update_layout(
+        margin={"r":0,"t":0,"l":0,"b":0}, 
+        height=700,
+        showlegend=False
+    )
+
+    event = st.plotly_chart(
+    fig_gral, 
+    use_container_width=True, 
+    on_select="rerun",  # Esto activa la captura de clics
+    key="mapa_principal" # Una clave única para el widget
+)
     
     if event and "selection" in event and event["selection"]["points"]:
         id_tocado = str(event["selection"]["points"][0]["location"])
@@ -559,4 +673,4 @@ else:
             st.session_state.muni_id = id_tocado
             st.rerun()
         else:
-            st.toast(f"El municipio seleccionado no es prioritario.", icon="X")
+            st.toast(f"El municipio seleccionado no es prioritario.", icon="❌")
