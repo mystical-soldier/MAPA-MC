@@ -50,10 +50,16 @@ def load_data():
     #1.2.4 CSV DATOS SECCION
     df_datmanz = pd.read_csv("INFO_MANZ.csv", encoding='utf-8-sig', dtype={'Secc': str})
     df_datmanz.columns = df_datmanz.columns.str.strip()
+    #1.2.5 CSV DATOS DISTRITO LOCAL
+    df_dlocal = pd.read_csv("DIST_L.csv", encoding='utf-8-sig', dtype={'NU_MUN': str,'SECCION': str})
+    df_dlocal.columns = df_dlocal.columns.str.strip()
+    #1.2.6 CSV DATOS DISTRITO FEDERAL
+    df_dfed = pd.read_csv("DIST_F.csv", encoding='utf-8-sig', dtype={'NU_MUN': str,'SECCION': str})
+    df_dfed.columns = df_dfed.columns.str.strip()
     
-    return geojson_mun, geojson_secc, geojson_manz, geojson_local, geojson_col, geojson_casilla, geojson_pavimento, df_muni, df_secc, df_manz, df_datmanz
+    return geojson_mun, geojson_secc, geojson_manz, geojson_local, geojson_col, geojson_casilla, geojson_pavimento, df_muni, df_secc, df_manz, df_datmanz, df_dlocal, df_dfed
 
-geojson_mun, geojson_secc, geojson_manz,geojson_local, geojson_col, geojson_casilla, geojson_pavimento, df_muni, df_secc, df_manz, df_datmanz = load_data()
+geojson_mun, geojson_secc, geojson_manz,geojson_local, geojson_col, geojson_casilla, geojson_pavimento, df_muni, df_secc, df_manz, df_datmanz, df_dlocal, df_dfed = load_data()
 
 # --- 2. ESTADO DE SELECCIoN ---
 #CONDICIONALES
@@ -103,9 +109,14 @@ if st.session_state.muni_id and st.session_state.seccion_id:
                if str(seccion_en_json).strip() == str(st.session_state.seccion_id).strip():
                     colonias_seccion.append(f)
     df_col = pd.DataFrame([f['properties'] for f in colonias_seccion])            
+    
     #---3.1.4 EXTRAER INFO DE MANZANAS
     #----3.1.4.1 FILTRADO INFORMACION DE MANZANAS
-    df_manz_secc = df_manz[df_manz['Secc'] == st.session_state.seccion_id]   
+    df_manz_secc = df_manz[df_manz['Secc'] == st.session_state.seccion_id]
+    #----3.1.4.2 FILTRADO INFORMACION DE DISTRITO FEDERAL
+    df_dfed_secc = df_dfed[df_dfed['SECCION'] == st.session_state.seccion_id]
+    #----3.1.4.3 FILTRADO INFORMACION DE DISTRITO LOCAL
+    df_dlocal_secc = df_dlocal[df_dlocal['SECCION'] == st.session_state.seccion_id]     
     #----3.1.5.2 FILTRADO DATO GENERAL SECCION
     df_datmanz_secc = df_datmanz[df_datmanz['Secc'] == st.session_state.seccion_id]
     #---3.1.6 EXTRAER INFO DE CASILLAS
@@ -125,7 +136,7 @@ if st.session_state.muni_id and st.session_state.seccion_id:
     with c1:
        
        with st.container(border=True):
-           st.subheader("DATOS DE CASILLA")
+           st.subheader("🧾 DATOS DE CASILLA")
            d1, d2 = st.columns(2)
            
            with d1:
@@ -154,7 +165,7 @@ if st.session_state.muni_id and st.session_state.seccion_id:
     #----3.1.7.2 RECUADRO DE INFORMACION 2 UBICACION CASILLA (INFORMACION EXTRAIDA DEL JSON DE CASILLAS)        
     with c2:
         with st.container(border=True):
-            st.subheader("🏘️ Colonias")
+            st.subheader("🏘️ COLONIAS")
             if not df_col.empty:
                 # Filtramos solo la columna NOMBRE (o las que necesites)
                 cols_visibles = [c for c in ['NOMBRE'] if c in df_col.columns]
@@ -179,9 +190,13 @@ if st.session_state.muni_id and st.session_state.seccion_id:
         with st.container(border=True):
             st.subheader("🏢 INFO SECCION")
             # Supongamos que tienes una columna 'Localidad' en tu CSV de manzanas
+            n_dfed = df_dfed_secc['DT_FED'].values[0]
+            n_dloc = df_dlocal_secc['DT_LOC'].values[0]
             n_loc = df_manz_secc['Localidad'].nunique() if 'Localidad' in df_datmanz_secc.columns else "N/A"
             n_col = df_manz_secc['Colonia'].nunique() if 'Colonia' in df_datmanz_secc.columns else "N/A"
+            st.write(f"DISTRITO LOCAL: **{n_dloc}** DISTRITO FEDERAL: **{n_dfed}**")
             st.write(f"Dentro de la seccion hay **{len(df_loc)}** localidades y ademas cuenta con ***{len(df_col)}*** colonias")
+            
     with c4:
         with st.container(border=True): 
             st.subheader("LISTADO NOMINAL SECCIONAL")
@@ -189,7 +204,7 @@ if st.session_state.muni_id and st.session_state.seccion_id:
             ln_total = datos_seccion_actual['Listado Nominal Total']           
             # TambiEn puedes traer la participaciOn si esTA en ese CSV
             part_pje = datos_seccion_actual.get('PORCENTAJE PARTICIPACION CIUDADANA', 'N/A')
-            st.write(f"LISTADO NOMINAL SECCIONAL: **{ln_total:,}**")
+            st.write(f"LISTADO NOMINAL SECCIONAL: **{ln_total}**")
             st.write(f"PARTICIPACION ELECTORAL: **{part_pje}%**")
             
     #---3.1.8 MAPA DE MANZANAS ---
