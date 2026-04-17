@@ -6,7 +6,7 @@ import plotly.express as px
 
 st.set_page_config(
     page_title="MAPA MC CHIAPAS 2026",
-    page_icon="???",
+    page_icon="🍊",
     layout="wide"
 )
 # --- LISTA DE MUNICIPIOS A RESALTAR ---
@@ -205,7 +205,6 @@ if st.session_state.muni_id and st.session_state.seccion_id:
             # TambiEn puedes traer la participaciOn si esTA en ese CSV
             part_pje = datos_seccion_actual.get('PORCENTAJE PARTICIPACION CIUDADANA', 'N/A')
             st.write(f"LISTADO NOMINAL SECCIONAL: **{ln_total}**")
-            st.write(f"PARTICIPACION ELECTORAL: **{part_pje}%**")
             
     #---3.1.8 MAPA DE MANZANAS ---
     col_mapa, col_tabla = st.columns([1.8, 1.2])
@@ -458,6 +457,7 @@ elif st.session_state.muni_id:
     
     info_muni = df_muni[df_muni['MUNICIPIO'] == st.session_state.muni_id].iloc[0]
     nombre_display = info_muni['NOMBRE MUNICIPIO']
+    LN_PARTICIPACION = ((info_muni['LISTADO NOMINAL'] * info_muni['PORCENTAJE PARTICIPACION CIUDADANA'])/100).round(2)
 
     if st.button(f"Regresar (Viendo: {nombre_display})"):
         st.session_state.muni_id = None
@@ -468,22 +468,22 @@ elif st.session_state.muni_id:
     with c1:
         with st.container(border=True):
             st.subheader("INFORMACION MUNICIPAL")
-            st.write(f"**{nombre_display}**. Distrito Federal: **{info_muni['DISTRITO FEDERAL']}**. Distrito Local: **{info_muni['DISTRITO LOCAL']}**.")
+            st.write(f"**{nombre_display}**.")
                                                                     
     with c2:
         with st.container(border=True):
             st.subheader("SECCIONES")
-            st.write(f"Total: **{info_muni['SECCION']:,}**. Prioritarias: **{info_muni['SECCION PRIORITARIOS']:,}** ({info_muni['PORCENTAJE PRIORITARIO']}%).")
+            st.write(f"TOTAL DE SECCIONES: **{info_muni['SECCION']:,}**. LAS CUALES SON PRIORITARIAS: **{info_muni['SECCION PRIORITARIOS']:,}**. CON UN PORCENTAJE PRIORITARIO DEL: **{info_muni['PORCENTAJE PRIORITARIO']}**%.")
     
     with c3:
         with st.container(border=True):
             st.subheader("MANZANAS")
-            st.write(f"Total: **{info_muni['MANZANA TOTAL']:,}**. SECCIONES PRIORITARIAS: **{info_muni['MANZANA PRIORITARIA']:,}**.")
+            st.write(f"TOTAL DE MANZANAS: **{info_muni['MANZANA TOTAL']:,}**. LA CUAL CUENTA CON **{info_muni['MANZANA PRIORITARIA']:,}**MANZANAS PRIORITARIAS. ")
     
     with c4:
         with st.container(border=True):
             st.subheader("PARTICIPACION")
-            st.write(f"LISTADO NOMINAL.: **{info_muni['LISTADO NOMINAL']}**. PARTICIPACION CIUDADANA: **{info_muni['PORCENTAJE PARTICIPACION CIUDADANA']}**%.")
+            st.write(f"SU LISTADO NOMINAL ES DE: **{info_muni['LISTADO NOMINAL']:,}**. CONTANDO CON UNA PARTICIPACION CIUDADANA DEL **{info_muni['PORCENTAJE PARTICIPACION CIUDADANA']}**%. DEJANDO UNA PARTICIPACION DE **{LN_PARTICIPACION:,}** DEL LISTADO NOMINAL")
 
     #3.2.2 --- FILA 2: MAPA DE SECCIONES (CAMBIO AQUi) Y TABLA ---
     col_mapa, col_tabla = st.columns([1.8, 1.2])
