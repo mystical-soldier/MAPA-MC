@@ -9,8 +9,8 @@ st.set_page_config(
     page_icon="🍊",
     layout="wide"
 )
-# --- LISTA DE MUNICIPIOS A RESALTAR ---
-municipios_naranja = ['102', '61', '90', '59','77','19','52','65','31','109','27','23','97','17','99','57','34','108','106','96','40','82']
+# --- LISTA DE MUNICIPIOS PRIORITARIOS ---
+municipios_naranja = ['102']
 # --- 1. CARGA DE DATOS ---
 @st.cache_data
 def load_data():
