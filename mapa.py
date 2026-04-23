@@ -1,16 +1,117 @@
 import streamlit as st
+import firebase_admin
+from firebase_admin import credentials, firestore
 import textwrap
 import json
 import pandas as pd
 import plotly.express as px
+from streamlit_cookies_manager import EncryptedCookieManager
+
+#cookies de logeo
+cookies = EncryptedCookieManager(
+    prefix="mi_app",
+    password="clave_super_secreta"
+)
+if not cookies.ready():
+    st.stop()
+
+# CONEXIÓN A FIREBASE
+if not firebase_admin._apps:
+    cred = credentials.Certificate(dict(st.secrets["firebase"]))
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+# FUNCIÓN: OBTENER MUNICIPIOS
+def obtener_municipios_usuario(usuario_data):
+
+    # ADMIN VE TODO
+    if usuario_data.get("role") == "admin":
+        return "ALL"
+
+    municipios = set()
+
+    # 🔹 Municipios por grupo
+    grupo = usuario_data.get("grupo")
+    if grupo:
+        doc = db.collection("GRUPOS").document(grupo).get()
+        if doc.exists:
+            municipios.update(doc.to_dict().get("municipios", []))
+
+    # 🔹 Municipios individuales extra
+    extras = usuario_data.get("municipios_extra", [])
+    municipios.update(extras)
+
+    return list(municipios)
+    
+#cookie    
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
+
+# 🔄 Recuperar desde cookies
+if not st.session_state.usuario:
+    if "usuario" in cookies:
+        st.session_state.usuario = cookies["usuario"]
+        st.session_state.permisos = cookies.get("permisos", [])    
+    
+    
+    # LOGIN
+def login():
+    st.title("🔐 Acceso al Sistema")
+
+    user = st.text_input("Usuario")
+    password = st.text_input("Contraseña", type="password")
+
+    if st.button("Ingresar"):
+
+        query = db.collection("USUARIOS").where("USUARIO", "==", user).stream()
+
+        usuario_data = None
+        for doc in query:
+            usuario_data = doc.to_dict()
+
+        if usuario_data:
+
+            if usuario_data.get("password") == password:
+
+                st.session_state.usuario = user
+                st.session_state.role = usuario_data.get("role")
+                st.session_state.permisos = obtener_municipios_usuario(usuario_data)
+                
+                cookies["usuario"] = user
+                cookies.save()
+
+                st.success("Acceso correcto")
+                st.rerun()
+                
+
+            else:
+                st.error("Contraseña incorrecta")
+
+        else:
+            st.error("Usuario no encontrado")
+
+# BLOQUEO SI NO HAY LOGIN
+# -------------------------------
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
+
+if not st.session_state.usuario:
+    login()
+    st.stop()            
+    
 
 st.set_page_config(
     page_title="MAPA MC CHIAPAS 2026",
     page_icon="🍊",
     layout="wide"
 )
-# --- LISTA DE MUNICIPIOS PRIORITARIOS ---
-municipios_naranja = ['102', '61', '90', '59','77','19','52','65','31','109','27','23','97','17','99','57','34','108','106','96','40','82']
+
+# --- LISTA DE MUNICIPIOS A RESALTAR ---
+if st.session_state.permisos == "ALL":
+    municipios_naranja = ['102','61','90','59','77','19','52','65','31','109','27','23','97','17','99','57','34','108','106','96','40','82']
+else:
+    municipios_naranja = st.session_state.permisos
 # --- 1. CARGA DE DATOS ---
 @st.cache_data
 def load_data():
@@ -69,7 +170,20 @@ if 'seccion_id' not in st.session_state:
     st.session_state.seccion_id = None    
 
 #---3. INTERFAZ ---
+
 st.title("Analisis Estrategico Chiapas")
+#usuario
+col1, col2 = st.columns([6,1])
+
+with col2:
+    if st.button("Cerrar sesión"):
+        cookies["usuario"] = ""
+        cookies["permisos"] = ""
+        cookies.save()
+
+        st.session_state.usuario = None
+        st.rerun()
+        st.caption(f"👤 USUARIO: {st.session_state.usuario}")
 #----3.1  SECCION INTO MANZANA (Nivel mas profundo)
 if st.session_state.muni_id and st.session_state.seccion_id:
     #---3.1 EXTRACCION DE INFORMACION DE LOS JSON
@@ -478,7 +592,7 @@ elif st.session_state.muni_id:
     with c3:
         with st.container(border=True):
             st.subheader("MANZANAS")
-            st.write(f"TOTAL DE MANZANAS: **{info_muni['MANZANA TOTAL']:,}**. LA CUAL CUENTA CON **{info_muni['MANZANA PRIORITARIA']:,}**MANZANAS PRIORITARIAS. ")
+            st.write(f"TOTAL DE MANZANAS: **{info_muni['MANZANA TOTAL']:,}**. LA CUAL CUENTA CON **{info_muni['MANZANA PRIORITARIA']:,}** MANZANAS PRIORITARIAS. ")
     
     with c4:
         with st.container(border=True):
