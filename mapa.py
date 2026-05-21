@@ -109,7 +109,7 @@ st.set_page_config(
 
 # --- LISTA DE MUNICIPIOS A RESALTAR ---
 if st.session_state.permisos == "ALL":
-    municipios_naranja = ['102','61','90','59','77','19','52','65','31','109','27','23','97','17','99','57','34','108','106','96','40','82']
+    municipios_naranja = ['102','61','90','59','77','19','52','65','31','109','27','23','97','17','99','57','34','108','106','96','40','82','13']
 else:
     municipios_naranja = st.session_state.permisos
 # --- 1. CARGA DE DATOS ---
